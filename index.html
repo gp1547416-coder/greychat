@@ -313,9 +313,9 @@
 </script>
 <script>
   (function() {
-    // --- MQTT broker (free, public, reliable) ---
+    // --- MQTT broker (secure WebSocket) ---
     const BROKER = 'broker.hivemq.com';
-    const PORT = 8000; // WebSocket port
+    const PORT = 8884; // Secure WebSocket port
     const TOPIC = 'chat/global';
 
     // --- DOM refs ---
@@ -333,7 +333,7 @@
     let client = null;
     let typingTimeout = null;
     let isTyping = false;
-    let users = new Set(); // online users
+    let users = new Set();
 
     // --- Helpers ---
     function formatTime(date) {
@@ -409,7 +409,6 @@
       client.send(msg);
     }
 
-    // --- Send join/leave ---
     function sendJoin() {
       publish('join', { from: username });
     }
@@ -418,14 +417,12 @@
       publish('leave', { from: username });
     }
 
-    // --- Send message ---
     function sendMessage(text) {
       text = text.trim();
       if (!text || !client || !client.isConnected()) return;
       publish('message', { from: username, text });
     }
 
-    // --- Send typing ---
     function sendTyping() {
       if (!client || !client.isConnected()) return;
       if (!isTyping) {
@@ -436,9 +433,10 @@
       }
     }
 
-    // --- MQTT connect ---
+    // --- MQTT connect (secure) ---
     function connectMQTT() {
-      client = new Paho.MQTT.Client(BROKER, PORT, 'client_' + Date.now() + '_' + Math.random());
+      // Use a unique client ID
+      client = new Paho.MQTT.Client(BROKER, PORT, 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
       client.onConnectionLost = function(response) {
         if (response.errorCode !== 0) {
           addSystemMessage('Disconnected — reconnecting...');
@@ -494,6 +492,7 @@
         },
         keepAliveInterval: 30,
         timeout: 5,
+        useSSL: true,   // ⬅️ critical for secure WebSocket
       });
     }
 
@@ -526,7 +525,6 @@
         usernameDisplay.textContent = username;
         // Notify server of name change
         sendLeave();
-        // Re-join with new name after a moment
         setTimeout(() => {
           users.delete(oldName);
           users.add(username);
@@ -541,14 +539,12 @@
     function init() {
       usernameDisplay.textContent = username;
       updateOnlineCount();
-
       connectMQTT();
 
       sendBtn.addEventListener('click', handleSend);
       input.addEventListener('keydown', handleKeydown);
       editNameBtn.addEventListener('click', editUsername);
 
-      // Send leave on page unload
       window.addEventListener('beforeunload', function() {
         sendLeave();
       });
