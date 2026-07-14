@@ -20,7 +20,6 @@
       align-items: center;
       color: #d0d0d0;
     }
-    /* ---------- Chat Container ---------- */
     #app {
       width: 100%;
       max-width: 900px;
@@ -34,7 +33,6 @@
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
       border: 1px solid #2a2a2a;
     }
-    /* ---------- Header ---------- */
     #header {
       padding: 16px 24px;
       background: #1a1a1a;
@@ -84,13 +82,11 @@
       color: #aaa;
       border: 1px solid #3a3a3a;
     }
-    /* ---------- Main Area (messages + sidebar) ---------- */
     #main {
       display: flex;
       flex: 1;
       overflow: hidden;
     }
-    /* ---------- Messages ---------- */
     #messages {
       flex: 1;
       padding: 16px 20px;
@@ -169,7 +165,6 @@
     .msg .text {
       color: #e8e8e8;
     }
-    /* system messages (join/leave) */
     .msg.system {
       align-self: center;
       max-width: 90%;
@@ -188,7 +183,6 @@
     .msg.system .avatar {
       display: none;
     }
-    /* typing indicator */
     #typing {
       padding: 8px 20px;
       font-size: 14px;
@@ -197,7 +191,6 @@
       background: #141414;
       border-top: 1px solid #1a1a1a;
     }
-    /* ---------- Input Area ---------- */
     #input-area {
       display: flex;
       gap: 10px;
@@ -237,7 +230,6 @@
       background: #3a3a3a;
       color: #fff;
     }
-    /* ---------- Online Users Sidebar ---------- */
     #users-sidebar {
       width: 180px;
       background: #111;
@@ -274,12 +266,10 @@
       background: #4caf50;
       display: inline-block;
     }
-    /* ---------- Animations ---------- */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    /* ---------- Responsive ---------- */
     @media (max-width: 700px) {
       #users-sidebar {
         display: none !important;
@@ -297,7 +287,6 @@
 </head>
 <body>
 <div id="app">
-  <!-- Header -->
   <div id="header">
     <h1>⚡ Gray Chat</h1>
     <div id="user-info">
@@ -306,8 +295,6 @@
       <span id="online-count">● 0 online</span>
     </div>
   </div>
-
-  <!-- Main -->
   <div id="main">
     <div id="messages"></div>
     <div id="users-sidebar">
@@ -315,11 +302,7 @@
       <ul id="user-list"></ul>
     </div>
   </div>
-
-  <!-- Typing -->
   <div id="typing"></div>
-
-  <!-- Input -->
   <div id="input-area">
     <input id="msg-input" placeholder="Type a message..." autocomplete="off" />
     <button id="send-btn">Send</button>
@@ -328,10 +311,10 @@
 
 <script>
   (function() {
-    // --- Configuration ---
-    const WS_URL = 'wss://ws.websocketking.com/'; // free public chat server
+    // ---- Use PieSocket (free, reliable) ----
+    const WS_URL = 'wss://free.blr2.piesocket.com/v3/1?api_key=VCXCEuvhGcBDP7XhiJJUDvR1e1D3eiVjgZ9VRiaV&notify_self=1';
 
-    // --- DOM refs ---
+    // DOM refs
     const messagesEl = document.getElementById('messages');
     const input = document.getElementById('msg-input');
     const sendBtn = document.getElementById('send-btn');
@@ -341,16 +324,17 @@
     const userListEl = document.getElementById('user-list');
     const typingEl = document.getElementById('typing');
 
-    // --- State ---
+    // State
     let username = localStorage.getItem('chat_username') || 'User' + Math.floor(Math.random() * 1000);
     let ws = null;
     let reconnectAttempts = 0;
-    const MAX_RECONNECT = 5;
+    const MAX_RECONNECT = 20;
     let typingTimeout = null;
     let isTyping = false;
-    let users = new Set(); // set of usernames
+    let users = new Set();
+    let reconnectTimer = null;
 
-    // --- Helpers ---
+    // Helpers
     function formatTime(date) {
       const h = date.getHours().toString().padStart(2, '0');
       const m = date.getMinutes().toString().padStart(2, '0');
@@ -362,19 +346,16 @@
     }
 
     function addMessage(data) {
-      // data: { type: 'message'|'system', from, text, time?, isSelf? }
       const div = document.createElement('div');
       div.className = 'msg';
       if (data.isSelf) div.classList.add('self');
       if (data.type === 'system') div.classList.add('system');
 
-      // Avatar
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
       avatar.textContent = data.from ? getInitials(data.from) : '?';
       div.appendChild(avatar);
 
-      // Bubble
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
       if (data.type === 'system') {
@@ -407,7 +388,6 @@
     function updateOnlineCount() {
       const count = users.size;
       onlineCountEl.textContent = '● ' + count + ' online';
-      // Update user list
       userListEl.innerHTML = '';
       const sorted = Array.from(users).sort();
       sorted.forEach(u => {
@@ -420,13 +400,20 @@
       });
     }
 
-    // --- WebSocket ---
+    // ---- WebSocket connection with auto-reconnect ----
     function connect() {
       if (ws && ws.readyState === WebSocket.OPEN) return;
-      ws = new WebSocket(WS_URL);
+
+      try {
+        ws = new WebSocket(WS_URL);
+      } catch (e) {
+        console.error('WebSocket creation error:', e);
+        scheduleReconnect();
+        return;
+      }
 
       ws.onopen = function() {
-        console.log('Connected to chat server');
+        console.log('Connected to PieSocket');
         reconnectAttempts = 0;
         // Send join message
         const joinMsg = {
@@ -434,16 +421,17 @@
           from: username
         };
         ws.send(JSON.stringify(joinMsg));
-        // Request current users? The server doesn't support; we rely on join/leave messages.
-        // For simplicity, we'll just show "connected".
         addSystemMessage('You joined the chat');
+        // Request current users list (PieSocket doesn't have built-in presence, so we rely on join/leave)
+        // We'll just show online count from joins/leaves.
       };
 
       ws.onmessage = function(event) {
         try {
           const data = JSON.parse(event.data);
+          // PieSocket wraps messages; actual payload is in data.data if they use that format.
+          // Our messages are plain JSON, so we handle directly.
           if (data.type === 'message') {
-            // from server broadcast
             const isSelf = data.from === username;
             const time = formatTime(new Date());
             addMessage({
@@ -466,7 +454,6 @@
               addSystemMessage(data.from + ' left the chat');
             }
           } else if (data.type === 'typing') {
-            // show typing indicator for others
             if (data.from !== username) {
               typingEl.textContent = data.from + ' is typing...';
               clearTimeout(typingTimeout);
@@ -474,33 +461,38 @@
                 typingEl.textContent = '';
               }, 2000);
             }
-          } else if (data.type === 'users') {
-            // some servers send list, but our chosen one doesn't, so ignore
           }
         } catch (e) {
-          // If not JSON, treat as plain text (fallback)
-          if (event.data && typeof event.data === 'string') {
-            // ignore echo
-          }
+          // ignore non-JSON messages
         }
       };
 
-      ws.onclose = function() {
+      ws.onclose = function(event) {
+        console.log('WebSocket closed:', event);
         addSystemMessage('Disconnected — reconnecting...');
-        if (reconnectAttempts < MAX_RECONNECT) {
-          reconnectAttempts++;
-          setTimeout(connect, 3000);
-        } else {
-          addSystemMessage('Unable to reconnect. Please refresh the page.');
-        }
+        scheduleReconnect();
       };
 
       ws.onerror = function(err) {
         console.error('WebSocket error:', err);
+        // The error will be followed by onclose, so we let onclose handle reconnect.
       };
     }
 
-    // --- Send message ---
+    function scheduleReconnect() {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (reconnectAttempts >= MAX_RECONNECT) {
+        addSystemMessage('Unable to reconnect after multiple attempts. Refresh the page.');
+        return;
+      }
+      const delay = Math.min(3000 * Math.pow(1.5, reconnectAttempts), 30000);
+      reconnectTimer = setTimeout(() => {
+        reconnectAttempts++;
+        connect();
+      }, delay);
+    }
+
+    // ---- Send message ----
     function sendMessage(text) {
       text = text.trim();
       if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
@@ -510,29 +502,21 @@
         text: text
       };
       ws.send(JSON.stringify(msg));
-      // Also add locally for immediate display (server will broadcast back)
-      // But to avoid duplication, we rely on the server echo. The server broadcasts to all, so we'll receive our own message.
-      // So we don't add it here.
     }
 
-    // --- Send typing event ---
+    // ---- Send typing ----
     function sendTyping() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       if (!isTyping) {
         isTyping = true;
-        const msg = {
-          type: 'typing',
-          from: username
-        };
+        const msg = { type: 'typing', from: username };
         ws.send(JSON.stringify(msg));
         clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-          isTyping = false;
-        }, 1000);
+        typingTimeout = setTimeout(() => { isTyping = false; }, 1000);
       }
     }
 
-    // --- UI handlers ---
+    // ---- UI handlers ----
     function handleSend() {
       const text = input.value;
       if (text) {
@@ -547,7 +531,6 @@
         e.preventDefault();
         handleSend();
       }
-      // Typing detection
       if (e.key !== 'Enter') {
         sendTyping();
       }
@@ -560,15 +543,13 @@
         username = newName.trim();
         localStorage.setItem('chat_username', username);
         usernameDisplay.textContent = username;
-        // Notify server of name change? We'll just rejoin with new name.
-        // We can send a leave for old and join for new.
+        // Notify server of name change
         if (ws && ws.readyState === WebSocket.OPEN) {
           const leaveMsg = { type: 'leave', from: oldName };
           ws.send(JSON.stringify(leaveMsg));
           const joinMsg = { type: 'join', from: username };
           ws.send(JSON.stringify(joinMsg));
         }
-        // Update users set: remove old, add new.
         users.delete(oldName);
         users.add(username);
         updateOnlineCount();
@@ -576,25 +557,20 @@
       }
     }
 
-    // --- Init ---
+    // ---- Init ----
     function init() {
       usernameDisplay.textContent = username;
-      // Show online count initially 0
       updateOnlineCount();
 
-      // Connect
       connect();
 
-      // Event listeners
       sendBtn.addEventListener('click', handleSend);
       input.addEventListener('keydown', handleKeydown);
       editNameBtn.addEventListener('click', editUsername);
 
-      // Focus input
       input.focus();
     }
 
-    // Start
     init();
   })();
 </script>
