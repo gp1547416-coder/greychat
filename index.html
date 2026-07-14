@@ -309,12 +309,16 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
+</script>
 <script>
   (function() {
-    // ---- Use PieSocket (free, reliable) ----
-    const WS_URL = 'wss://free.blr2.piesocket.com/v3/1?api_key=VCXCEuvhGcBDP7XhiJJUDvR1e1D3eiVjgZ9VRiaV&notify_self=1';
+    // --- MQTT broker (free, public, reliable) ---
+    const BROKER = 'broker.hivemq.com';
+    const PORT = 8000; // WebSocket port
+    const TOPIC = 'chat/global';
 
-    // DOM refs
+    // --- DOM refs ---
     const messagesEl = document.getElementById('messages');
     const input = document.getElementById('msg-input');
     const sendBtn = document.getElementById('send-btn');
@@ -324,17 +328,14 @@
     const userListEl = document.getElementById('user-list');
     const typingEl = document.getElementById('typing');
 
-    // State
+    // --- State ---
     let username = localStorage.getItem('chat_username') || 'User' + Math.floor(Math.random() * 1000);
-    let ws = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT = 20;
+    let client = null;
     let typingTimeout = null;
     let isTyping = false;
-    let users = new Set();
-    let reconnectTimer = null;
+    let users = new Set(); // online users
 
-    // Helpers
+    // --- Helpers ---
     function formatTime(date) {
       const h = date.getHours().toString().padStart(2, '0');
       const m = date.getMinutes().toString().padStart(2, '0');
@@ -400,37 +401,53 @@
       });
     }
 
-    // ---- WebSocket connection with auto-reconnect ----
-    function connect() {
-      if (ws && ws.readyState === WebSocket.OPEN) return;
+    // --- MQTT publish ---
+    function publish(type, payload) {
+      if (!client || !client.isConnected()) return;
+      const msg = new Paho.MQTT.Message(JSON.stringify({ type, ...payload }));
+      msg.destinationName = TOPIC;
+      client.send(msg);
+    }
 
-      try {
-        ws = new WebSocket(WS_URL);
-      } catch (e) {
-        console.error('WebSocket creation error:', e);
-        scheduleReconnect();
-        return;
+    // --- Send join/leave ---
+    function sendJoin() {
+      publish('join', { from: username });
+    }
+
+    function sendLeave() {
+      publish('leave', { from: username });
+    }
+
+    // --- Send message ---
+    function sendMessage(text) {
+      text = text.trim();
+      if (!text || !client || !client.isConnected()) return;
+      publish('message', { from: username, text });
+    }
+
+    // --- Send typing ---
+    function sendTyping() {
+      if (!client || !client.isConnected()) return;
+      if (!isTyping) {
+        isTyping = true;
+        publish('typing', { from: username });
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => { isTyping = false; }, 1000);
       }
+    }
 
-      ws.onopen = function() {
-        console.log('Connected to PieSocket');
-        reconnectAttempts = 0;
-        // Send join message
-        const joinMsg = {
-          type: 'join',
-          from: username
-        };
-        ws.send(JSON.stringify(joinMsg));
-        addSystemMessage('You joined the chat');
-        // Request current users list (PieSocket doesn't have built-in presence, so we rely on join/leave)
-        // We'll just show online count from joins/leaves.
+    // --- MQTT connect ---
+    function connectMQTT() {
+      client = new Paho.MQTT.Client(BROKER, PORT, 'client_' + Date.now() + '_' + Math.random());
+      client.onConnectionLost = function(response) {
+        if (response.errorCode !== 0) {
+          addSystemMessage('Disconnected — reconnecting...');
+          setTimeout(connectMQTT, 3000);
+        }
       };
-
-      ws.onmessage = function(event) {
+      client.onMessageArrived = function(message) {
         try {
-          const data = JSON.parse(event.data);
-          // PieSocket wraps messages; actual payload is in data.data if they use that format.
-          // Our messages are plain JSON, so we handle directly.
+          const data = JSON.parse(message.payloadString);
           if (data.type === 'message') {
             const isSelf = data.from === username;
             const time = formatTime(new Date());
@@ -457,66 +474,30 @@
             if (data.from !== username) {
               typingEl.textContent = data.from + ' is typing...';
               clearTimeout(typingTimeout);
-              typingTimeout = setTimeout(() => {
-                typingEl.textContent = '';
-              }, 2000);
+              typingTimeout = setTimeout(() => { typingEl.textContent = ''; }, 2000);
             }
           }
         } catch (e) {
-          // ignore non-JSON messages
+          // ignore
         }
       };
 
-      ws.onclose = function(event) {
-        console.log('WebSocket closed:', event);
-        addSystemMessage('Disconnected — reconnecting...');
-        scheduleReconnect();
-      };
-
-      ws.onerror = function(err) {
-        console.error('WebSocket error:', err);
-        // The error will be followed by onclose, so we let onclose handle reconnect.
-      };
+      client.connect({
+        onSuccess: function() {
+          addSystemMessage('Connected to chat');
+          client.subscribe(TOPIC);
+          sendJoin();
+        },
+        onFailure: function(err) {
+          addSystemMessage('Failed to connect — retrying...');
+          setTimeout(connectMQTT, 3000);
+        },
+        keepAliveInterval: 30,
+        timeout: 5,
+      });
     }
 
-    function scheduleReconnect() {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (reconnectAttempts >= MAX_RECONNECT) {
-        addSystemMessage('Unable to reconnect after multiple attempts. Refresh the page.');
-        return;
-      }
-      const delay = Math.min(3000 * Math.pow(1.5, reconnectAttempts), 30000);
-      reconnectTimer = setTimeout(() => {
-        reconnectAttempts++;
-        connect();
-      }, delay);
-    }
-
-    // ---- Send message ----
-    function sendMessage(text) {
-      text = text.trim();
-      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-      const msg = {
-        type: 'message',
-        from: username,
-        text: text
-      };
-      ws.send(JSON.stringify(msg));
-    }
-
-    // ---- Send typing ----
-    function sendTyping() {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (!isTyping) {
-        isTyping = true;
-        const msg = { type: 'typing', from: username };
-        ws.send(JSON.stringify(msg));
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => { isTyping = false; }, 1000);
-      }
-    }
-
-    // ---- UI handlers ----
+    // --- UI handlers ---
     function handleSend() {
       const text = input.value;
       if (text) {
@@ -544,29 +525,33 @@
         localStorage.setItem('chat_username', username);
         usernameDisplay.textContent = username;
         // Notify server of name change
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          const leaveMsg = { type: 'leave', from: oldName };
-          ws.send(JSON.stringify(leaveMsg));
-          const joinMsg = { type: 'join', from: username };
-          ws.send(JSON.stringify(joinMsg));
-        }
-        users.delete(oldName);
-        users.add(username);
-        updateOnlineCount();
-        addSystemMessage('You changed your name to ' + username);
+        sendLeave();
+        // Re-join with new name after a moment
+        setTimeout(() => {
+          users.delete(oldName);
+          users.add(username);
+          updateOnlineCount();
+          sendJoin();
+          addSystemMessage('You changed your name to ' + username);
+        }, 100);
       }
     }
 
-    // ---- Init ----
+    // --- Init ---
     function init() {
       usernameDisplay.textContent = username;
       updateOnlineCount();
 
-      connect();
+      connectMQTT();
 
       sendBtn.addEventListener('click', handleSend);
       input.addEventListener('keydown', handleKeydown);
       editNameBtn.addEventListener('click', editUsername);
+
+      // Send leave on page unload
+      window.addEventListener('beforeunload', function() {
+        sendLeave();
+      });
 
       input.focus();
     }
