@@ -1,558 +1,566 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gray Chat · zero config</title>
-  <style>
-    /* ---------- Reset & Base ---------- */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      background: #0c0c0c;
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: #d0d0d0;
-    }
-    #app {
-      width: 100%;
-      max-width: 900px;
-      height: 100vh;
-      max-height: 700px;
-      background: #141414;
-      border-radius: 20px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-      border: 1px solid #2a2a2a;
-    }
-    #header {
-      padding: 16px 24px;
-      background: #1a1a1a;
-      border-bottom: 1px solid #2a2a2a;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    #header h1 {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      color: #e0e0e0;
-    }
-    #user-info {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    #username-display {
-      background: #282828;
-      padding: 6px 14px;
-      border-radius: 30px;
-      font-size: 14px;
-      color: #bbb;
-      border: 1px solid #3a3a3a;
-    }
-    #edit-name {
-      background: #333;
-      border: none;
-      color: #eee;
-      padding: 6px 14px;
-      border-radius: 30px;
-      font-size: 13px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    #edit-name:hover {
-      background: #444;
-    }
-    #online-count {
-      background: #282828;
-      padding: 6px 14px;
-      border-radius: 30px;
-      font-size: 13px;
-      color: #aaa;
-      border: 1px solid #3a3a3a;
-    }
-    #main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-    }
-    #messages {
-      flex: 1;
-      padding: 16px 20px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      background: #141414;
-    }
-    #messages::-webkit-scrollbar {
-      width: 6px;
-    }
-    #messages::-webkit-scrollbar-track {
-      background: #1a1a1a;
-    }
-    #messages::-webkit-scrollbar-thumb {
-      background: #3a3a3a;
-      border-radius: 10px;
-    }
-    .msg {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      max-width: 75%;
-      animation: fadeIn 0.2s ease;
-    }
-    .msg.self {
-      flex-direction: row-reverse;
-      align-self: flex-end;
-    }
-    .msg .avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #2a2a2a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 15px;
-      color: #ccc;
-      flex-shrink: 0;
-      border: 1px solid #3a3a3a;
-    }
-    .msg .bubble {
-      background: #222;
-      padding: 10px 14px;
-      border-radius: 14px;
-      border-top-left-radius: 4px;
-      word-wrap: break-word;
-      line-height: 1.4;
-      font-size: 15px;
-      border: 1px solid #2e2e2e;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .msg.self .bubble {
-      background: #2a2a2a;
-      border-top-left-radius: 14px;
-      border-top-right-radius: 4px;
-      border-color: #3a3a3a;
-    }
-    .msg .name {
-      font-weight: 600;
-      font-size: 13px;
-      color: #aaa;
-      margin-bottom: 2px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .msg .time {
-      font-size: 11px;
-      color: #666;
-      margin-left: 6px;
-    }
-    .msg .text {
-      color: #e8e8e8;
-    }
-    .msg.system {
-      align-self: center;
-      max-width: 90%;
-      background: transparent;
-      justify-content: center;
-    }
-    .msg.system .bubble {
-      background: #1e1e1e;
-      border: 1px solid #2a2a2a;
-      color: #888;
-      font-size: 13px;
-      padding: 6px 18px;
-      border-radius: 40px;
-      text-align: center;
-    }
-    .msg.system .avatar {
-      display: none;
-    }
-    #typing {
-      padding: 8px 20px;
-      font-size: 14px;
-      color: #888;
-      height: 28px;
-      background: #141414;
-      border-top: 1px solid #1a1a1a;
-    }
-    #input-area {
-      display: flex;
-      gap: 10px;
-      padding: 12px 20px 16px;
-      background: #141414;
-      border-top: 1px solid #1a1a1a;
-      flex-shrink: 0;
-    }
-    #input-area input {
-      flex: 1;
-      background: #1e1e1e;
-      border: 1px solid #2e2e2e;
-      padding: 12px 16px;
-      border-radius: 30px;
-      font-size: 15px;
-      color: #eee;
-      outline: none;
-      transition: 0.2s;
-    }
-    #input-area input:focus {
-      border-color: #555;
-      background: #222;
-    }
-    #input-area button {
-      background: #2a2a2a;
-      border: none;
-      color: #ddd;
-      padding: 0 24px;
-      border-radius: 30px;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: 0.2s;
-      border: 1px solid #3a3a3a;
-    }
-    #input-area button:hover {
-      background: #3a3a3a;
-      color: #fff;
-    }
-    #users-sidebar {
-      width: 180px;
-      background: #111;
-      border-left: 1px solid #1e1e1e;
-      padding: 16px 12px;
-      overflow-y: auto;
-      flex-shrink: 0;
-      display: none;
-    }
-    #users-sidebar h3 {
-      font-size: 13px;
-      text-transform: uppercase;
-      color: #666;
-      letter-spacing: 0.5px;
-      margin-bottom: 12px;
-    }
-    #users-sidebar ul {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    #users-sidebar li {
-      font-size: 14px;
-      color: #aaa;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    #users-sidebar li .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #4caf50;
-      display: inline-block;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @media (max-width: 700px) {
-      #users-sidebar {
-        display: none !important;
-      }
-      #app {
-        max-height: 100vh;
-        border-radius: 0;
-        border: none;
-      }
-      .msg {
-        max-width: 90%;
-      }
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gray Chat · zero config</title>
+    <style>
+        /* ---------- Reset & Base ---------- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0c0c0c;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #d0d0d0;
+        }
+        #app {
+            width: 100%;
+            max-width: 900px;
+            height: 100vh;
+            max-height: 700px;
+            background: #141414;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            border: 1px solid #2a2a2a;
+        }
+        #header {
+            padding: 16px 24px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        #header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #e0e0e0;
+        }
+        #user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        #username-display {
+            background: #282828;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 14px;
+            color: #bbb;
+            border: 1px solid #3a3a3a;
+        }
+        #edit-name {
+            background: #333;
+            border: none;
+            color: #eee;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #edit-name:hover {
+            background: #444;
+        }
+        #online-count {
+            background: #282828;
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 13px;
+            color: #aaa;
+            border: 1px solid #3a3a3a;
+        }
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        #messages {
+            flex: 1;
+            padding: 16px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: #141414;
+        }
+        #messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        #messages::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        #messages::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 10px;
+        }
+        .msg {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            max-width: 75%;
+            animation: fadeIn 0.2s ease;
+        }
+        .msg.self {
+            flex-direction: row-reverse;
+            align-self: flex-end;
+        }
+        .msg .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #2a2a2a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 15px;
+            color: #ccc;
+            flex-shrink: 0;
+            border: 1px solid #3a3a3a;
+        }
+        .msg .bubble {
+            background: #222;
+            padding: 10px 14px;
+            border-radius: 14px;
+            border-top-left-radius: 4px;
+            word-wrap: break-word;
+            line-height: 1.4;
+            font-size: 15px;
+            border: 1px solid #2e2e2e;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .msg.self .bubble {
+            background: #2a2a2a;
+            border-top-left-radius: 14px;
+            border-top-right-radius: 4px;
+            border-color: #3a3a3a;
+        }
+        .msg .name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #aaa;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .msg .time {
+            font-size: 11px;
+            color: #666;
+            margin-left: 6px;
+        }
+        .msg .text {
+            color: #e8e8e8;
+        }
+        .msg.system {
+            align-self: center;
+            max-width: 90%;
+            background: transparent;
+            justify-content: center;
+        }
+        .msg.system .bubble {
+            background: #1e1e1e;
+            border: 1px solid #2a2a2a;
+            color: #888;
+            font-size: 13px;
+            padding: 6px 18px;
+            border-radius: 40px;
+            text-align: center;
+        }
+        .msg.system .avatar {
+            display: none;
+        }
+        #typing {
+            padding: 8px 20px;
+            font-size: 14px;
+            color: #888;
+            height: 28px;
+            background: #141414;
+            border-top: 1px solid #1a1a1a;
+        }
+        #input-area {
+            display: flex;
+            gap: 10px;
+            padding: 12px 20px 16px;
+            background: #141414;
+            border-top: 1px solid #1a1a1a;
+            flex-shrink: 0;
+        }
+        #input-area input {
+            flex: 1;
+            background: #1e1e1e;
+            border: 1px solid #2e2e2e;
+            padding: 12px 16px;
+            border-radius: 30px;
+            font-size: 15px;
+            color: #eee;
+            outline: none;
+            transition: 0.2s;
+        }
+        #input-area input:focus {
+            border-color: #555;
+            background: #222;
+        }
+        #input-area button {
+            background: #2a2a2a;
+            border: none;
+            color: #ddd;
+            padding: 0 24px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid #3a3a3a;
+        }
+        #input-area button:hover {
+            background: #3a3a3a;
+            color: #fff;
+        }
+        #users-sidebar {
+            width: 180px;
+            background: #111;
+            border-left: 1px solid #1e1e1e;
+            padding: 16px 12px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: none;
+        }
+        #users-sidebar h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: #666;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        #users-sidebar ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        #users-sidebar li {
+            font-size: 14px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #users-sidebar li .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            display: inline-block;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @media (max-width: 700px) {
+            #users-sidebar {
+                display: none !important;
+            }
+            #app {
+                max-height: 100vh;
+                border-radius: 0;
+                border: none;
+            }
+            .msg {
+                max-width: 90%;
+            }
+        }
+    </style>
 </head>
 <body>
-<div id="app">
-  <div id="header">
-    <h1>⚡ Gray Chat</h1>
-    <div id="user-info">
-      <span id="username-display">Guest</span>
-      <button id="edit-name">✎</button>
-      <span id="online-count">● 0 online</span>
+    <div id="app">
+        <div id="header">
+            <h1>⚡ Gray Chat</h1>
+            <div id="user-info">
+                <span id="username-display">Guest</span>
+                <button id="edit-name">✎</button>
+                <span id="online-count">● 0 online</span>
+            </div>
+        </div>
+        <div id="main">
+            <div id="messages"></div>
+            <div id="users-sidebar">
+                <h3>Online</h3>
+                <ul id="user-list"></ul>
+            </div>
+        </div>
+        <div id="typing"></div>
+        <div id="input-area">
+            <input id="msg-input" placeholder="Type a message..." autocomplete="off" />
+            <button id="send-btn">Send</button>
+        </div>
     </div>
-  </div>
-  <div id="main">
-    <div id="messages"></div>
-    <div id="users-sidebar">
-      <h3>Online</h3>
-      <ul id="user-list"></ul>
-    </div>
-  </div>
-  <div id="typing"></div>
-  <div id="input-area">
-    <input id="msg-input" placeholder="Type a message..." autocomplete="off" />
-    <button id="send-btn">Send</button>
-  </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
-</script>
-<script>
-  (function() {
-    // --- MQTT broker (non‑secure WebSocket) ---
-    const BROKER = 'broker.hivemq.com';
-    const PORT = 8000;          // standard WebSocket port (no SSL)
-    const TOPIC = 'chat/global';
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js">
+    </script>
+    <script>
+        (function() {
+            // --- Use EMQX public broker (more reliable) ---
+            const BROKER = 'broker.emqx.io';
+            const PORT = 8083; // WebSocket port (non-TLS) 
+            const TOPIC = 'chat/global';
 
-    // --- DOM refs ---
-    const messagesEl = document.getElementById('messages');
-    const input = document.getElementById('msg-input');
-    const sendBtn = document.getElementById('send-btn');
-    const usernameDisplay = document.getElementById('username-display');
-    const editNameBtn = document.getElementById('edit-name');
-    const onlineCountEl = document.getElementById('online-count');
-    const userListEl = document.getElementById('user-list');
-    const typingEl = document.getElementById('typing');
+            // --- DOM refs ---
+            const messagesEl = document.getElementById('messages');
+            const input = document.getElementById('msg-input');
+            const sendBtn = document.getElementById('send-btn');
+            const usernameDisplay = document.getElementById('username-display');
+            const editNameBtn = document.getElementById('edit-name');
+            const onlineCountEl = document.getElementById('online-count');
+            const userListEl = document.getElementById('user-list');
+            const typingEl = document.getElementById('typing');
 
-    // --- State ---
-    let username = localStorage.getItem('chat_username') || 'User' + Math.floor(Math.random() * 1000);
-    let client = null;
-    let typingTimeout = null;
-    let isTyping = false;
-    let users = new Set();
+            // --- State ---
+            let username = localStorage.getItem('chat_username') || 'User' + Math.floor(Math.random() * 1000);
+            let client = null;
+            let typingTimeout = null;
+            let isTyping = false;
+            let users = new Set();
 
-    // --- Helpers ---
-    function formatTime(date) {
-      const h = date.getHours().toString().padStart(2, '0');
-      const m = date.getMinutes().toString().padStart(2, '0');
-      return h + ':' + m;
-    }
-
-    function getInitials(name) {
-      return name.charAt(0).toUpperCase();
-    }
-
-    function addMessage(data) {
-      const div = document.createElement('div');
-      div.className = 'msg';
-      if (data.isSelf) div.classList.add('self');
-      if (data.type === 'system') div.classList.add('system');
-
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      avatar.textContent = data.from ? getInitials(data.from) : '?';
-      div.appendChild(avatar);
-
-      const bubble = document.createElement('div');
-      bubble.className = 'bubble';
-      if (data.type === 'system') {
-        bubble.textContent = data.text;
-      } else {
-        const nameLine = document.createElement('div');
-        nameLine.className = 'name';
-        nameLine.textContent = data.from || 'Unknown';
-        if (data.time) {
-          const timeSpan = document.createElement('span');
-          timeSpan.className = 'time';
-          timeSpan.textContent = data.time;
-          nameLine.appendChild(timeSpan);
-        }
-        const textDiv = document.createElement('div');
-        textDiv.className = 'text';
-        textDiv.textContent = data.text;
-        bubble.appendChild(nameLine);
-        bubble.appendChild(textDiv);
-      }
-      div.appendChild(bubble);
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    function addSystemMessage(text) {
-      addMessage({ type: 'system', text });
-    }
-
-    function updateOnlineCount() {
-      const count = users.size;
-      onlineCountEl.textContent = '● ' + count + ' online';
-      userListEl.innerHTML = '';
-      const sorted = Array.from(users).sort();
-      sorted.forEach(u => {
-        const li = document.createElement('li');
-        const dot = document.createElement('span');
-        dot.className = 'dot';
-        li.appendChild(dot);
-        li.appendChild(document.createTextNode(u));
-        userListEl.appendChild(li);
-      });
-    }
-
-    // --- MQTT publish ---
-    function publish(type, payload) {
-      if (!client || !client.isConnected()) return;
-      const msg = new Paho.MQTT.Message(JSON.stringify({ type, ...payload }));
-      msg.destinationName = TOPIC;
-      client.send(msg);
-    }
-
-    function sendJoin() {
-      publish('join', { from: username });
-    }
-
-    function sendLeave() {
-      publish('leave', { from: username });
-    }
-
-    function sendMessage(text) {
-      text = text.trim();
-      if (!text || !client || !client.isConnected()) return;
-      publish('message', { from: username, text });
-    }
-
-    function sendTyping() {
-      if (!client || !client.isConnected()) return;
-      if (!isTyping) {
-        isTyping = true;
-        publish('typing', { from: username });
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => { isTyping = false; }, 1000);
-      }
-    }
-
-    // --- MQTT connect (non‑secure) ---
-    function connectMQTT() {
-      client = new Paho.MQTT.Client(BROKER, PORT, 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
-      client.onConnectionLost = function(response) {
-        if (response.errorCode !== 0) {
-          addSystemMessage('Disconnected — reconnecting...');
-          setTimeout(connectMQTT, 3000);
-        }
-      };
-      client.onMessageArrived = function(message) {
-        try {
-          const data = JSON.parse(message.payloadString);
-          if (data.type === 'message') {
-            const isSelf = data.from === username;
-            const time = formatTime(new Date());
-            addMessage({
-              type: 'message',
-              from: data.from,
-              text: data.text,
-              time: time,
-              isSelf: isSelf
-            });
-          } else if (data.type === 'join') {
-            users.add(data.from);
-            updateOnlineCount();
-            if (data.from !== username) {
-              addSystemMessage(data.from + ' joined the chat');
+            // --- Helpers ---
+            function formatTime(date) {
+                const h = date.getHours().toString().padStart(2, '0');
+                const m = date.getMinutes().toString().padStart(2, '0');
+                return h + ':' + m;
             }
-          } else if (data.type === 'leave') {
-            users.delete(data.from);
-            updateOnlineCount();
-            if (data.from !== username) {
-              addSystemMessage(data.from + ' left the chat');
+
+            function getInitials(name) {
+                return name.charAt(0).toUpperCase();
             }
-          } else if (data.type === 'typing') {
-            if (data.from !== username) {
-              typingEl.textContent = data.from + ' is typing...';
-              clearTimeout(typingTimeout);
-              typingTimeout = setTimeout(() => { typingEl.textContent = ''; }, 2000);
+
+            function addMessage(data) {
+                const div = document.createElement('div');
+                div.className = 'msg';
+                if (data.isSelf) div.classList.add('self');
+                if (data.type === 'system') div.classList.add('system');
+
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar';
+                avatar.textContent = data.from ? getInitials(data.from) : '?';
+                div.appendChild(avatar);
+
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble';
+                if (data.type === 'system') {
+                    bubble.textContent = data.text;
+                } else {
+                    const nameLine = document.createElement('div');
+                    nameLine.className = 'name';
+                    nameLine.textContent = data.from || 'Unknown';
+                    if (data.time) {
+                        const timeSpan = document.createElement('span');
+                        timeSpan.className = 'time';
+                        timeSpan.textContent = data.time;
+                        nameLine.appendChild(timeSpan);
+                    }
+                    const textDiv = document.createElement('div');
+                    textDiv.className = 'text';
+                    textDiv.textContent = data.text;
+                    bubble.appendChild(nameLine);
+                    bubble.appendChild(textDiv);
+                }
+                div.appendChild(bubble);
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
             }
-          }
-        } catch (e) {
-          // ignore
-        }
-      };
 
-      client.connect({
-        onSuccess: function() {
-          addSystemMessage('Connected to chat');
-          client.subscribe(TOPIC);
-          sendJoin();
-        },
-        onFailure: function(err) {
-          addSystemMessage('Failed to connect — retrying...');
-          setTimeout(connectMQTT, 3000);
-        },
-        keepAliveInterval: 30,
-        timeout: 5,
-        // useSSL is NOT set – we're on port 8000
-      });
-    }
+            function addSystemMessage(text) {
+                addMessage({ type: 'system', text });
+            }
 
-    // --- UI handlers ---
-    function handleSend() {
-      const text = input.value;
-      if (text) {
-        sendMessage(text);
-        input.value = '';
-        input.focus();
-      }
-    }
+            function updateOnlineCount() {
+                const count = users.size;
+                onlineCountEl.textContent = '● ' + count + ' online';
+                userListEl.innerHTML = '';
+                const sorted = Array.from(users).sort();
+                sorted.forEach(u => {
+                    const li = document.createElement('li');
+                    const dot = document.createElement('span');
+                    dot.className = 'dot';
+                    li.appendChild(dot);
+                    li.appendChild(document.createTextNode(u));
+                    userListEl.appendChild(li);
+                });
+            }
 
-    function handleKeydown(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-      if (e.key !== 'Enter') {
-        sendTyping();
-      }
-    }
+            // --- MQTT publish ---
+            function publish(type, payload) {
+                if (!client || !client.isConnected()) return;
+                const msg = new Paho.MQTT.Message(JSON.stringify({ type, ...payload }));
+                msg.destinationName = TOPIC;
+                client.send(msg);
+            }
 
-    function editUsername() {
-      const newName = prompt('Enter your new username:', username);
-      if (newName && newName.trim() !== '') {
-        const oldName = username;
-        username = newName.trim();
-        localStorage.setItem('chat_username', username);
-        usernameDisplay.textContent = username;
-        // Notify server of name change
-        sendLeave();
-        setTimeout(() => {
-          users.delete(oldName);
-          users.add(username);
-          updateOnlineCount();
-          sendJoin();
-          addSystemMessage('You changed your name to ' + username);
-        }, 100);
-      }
-    }
+            function sendJoin() {
+                publish('join', { from: username });
+            }
 
-    // --- Init ---
-    function init() {
-      usernameDisplay.textContent = username;
-      updateOnlineCount();
-      connectMQTT();
+            function sendLeave() {
+                publish('leave', { from: username });
+            }
 
-      sendBtn.addEventListener('click', handleSend);
-      input.addEventListener('keydown', handleKeydown);
-      editNameBtn.addEventListener('click', editUsername);
+            function sendMessage(text) {
+                text = text.trim();
+                if (!text || !client || !client.isConnected()) return;
+                publish('message', { from: username, text });
+            }
 
-      window.addEventListener('beforeunload', function() {
-        sendLeave();
-      });
+            function sendTyping() {
+                if (!client || !client.isConnected()) return;
+                if (!isTyping) {
+                    isTyping = true;
+                    publish('typing', { from: username });
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(() => { isTyping = false; }, 1000);
+                }
+            }
 
-      input.focus();
-    }
+            // --- MQTT connect ---
+            function connectMQTT() {
+                // Use a unique client ID to avoid conflicts
+                client = new Paho.MQTT.Client(BROKER, PORT, 'client_' + Date.now() + '_' + Math.random().toString(36)
+                .substr(2, 5));
+                client.onConnectionLost = function(response) {
+                    if (response.errorCode !== 0) {
+                        addSystemMessage('Disconnected — reconnecting...');
+                        setTimeout(connectMQTT, 3000);
+                    }
+                };
+                client.onMessageArrived = function(message) {
+                    try {
+                        const data = JSON.parse(message.payloadString);
+                        if (data.type === 'message') {
+                            const isSelf = data.from === username;
+                            const time = formatTime(new Date());
+                            addMessage({
+                                type: 'message',
+                                from: data.from,
+                                text: data.text,
+                                time: time,
+                                isSelf: isSelf
+                            });
+                        } else if (data.type === 'join') {
+                            users.add(data.from);
+                            updateOnlineCount();
+                            if (data.from !== username) {
+                                addSystemMessage(data.from + ' joined the chat');
+                            }
+                        } else if (data.type === 'leave') {
+                            users.delete(data.from);
+                            updateOnlineCount();
+                            if (data.from !== username) {
+                                addSystemMessage(data.from + ' left the chat');
+                            }
+                        } else if (data.type === 'typing') {
+                            if (data.from !== username) {
+                                typingEl.textContent = data.from + ' is typing...';
+                                clearTimeout(typingTimeout);
+                                typingTimeout = setTimeout(() => { typingEl.textContent = ''; }, 2000);
+                            }
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                };
 
-    init();
-  })();
-</script>
+                client.connect({
+                    onSuccess: function() {
+                        addSystemMessage('Connected to chat');
+                        client.subscribe(TOPIC);
+                        sendJoin();
+                    },
+                    onFailure: function(err) {
+                        addSystemMessage('Failed to connect — retrying...');
+                        setTimeout(connectMQTT, 3000);
+                    },
+                    keepAliveInterval: 30,
+                    timeout: 5,
+                    // useSSL is NOT set – we're on port 8083
+                });
+            }
+
+            // --- UI handlers ---
+            function handleSend() {
+                const text = input.value;
+                if (text) {
+                    sendMessage(text);
+                    input.value = '';
+                    input.focus();
+                }
+            }
+
+            function handleKeydown(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+                if (e.key !== 'Enter') {
+                    sendTyping();
+                }
+            }
+
+            function editUsername() {
+                const newName = prompt('Enter your new username:', username);
+                if (newName && newName.trim() !== '') {
+                    const oldName = username;
+                    username = newName.trim();
+                    localStorage.setItem('chat_username', username);
+                    usernameDisplay.textContent = username;
+                    // Notify server of name change
+                    sendLeave();
+                    setTimeout(() => {
+                        users.delete(oldName);
+                        users.add(username);
+                        updateOnlineCount();
+                        sendJoin();
+                        addSystemMessage('You changed your name to ' + username);
+                    }, 100);
+                }
+            }
+
+            // --- Init ---
+            function init() {
+                usernameDisplay.textContent = username;
+                updateOnlineCount();
+                connectMQTT();
+
+                sendBtn.addEventListener('click', handleSend);
+                input.addEventListener('keydown', handleKeydown);
+                editNameBtn.addEventListener('click', editUsername);
+
+                window.addEventListener('beforeunload', function() {
+                    sendLeave();
+                });
+
+                input.focus();
+            }
+
+            init();
+        })();
+    </script>
 </body>
 </html>
